@@ -1,0 +1,64 @@
+{
+  "name": "@cinatra-ai/pdf-artifact",
+  "version": "0.1.0",
+  "license": "Apache-2.0",
+  "type": "module",
+  "files": [
+    "src"
+  ],
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "dependencies": {
+    "react-pdf": "10.4.1",
+    "pdfjs-dist": "5.4.296"
+  },
+  "peerDependencies": {
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "@cinatra-ai/sdk-extensions": "*"
+  },
+  "peerDependenciesMeta": {
+    "@cinatra-ai/sdk-extensions": {
+      "optional": true
+    }
+  },
+  "cinatra": {
+    "apiVersion": "cinatra.ai/v1",
+    "kind": "artifact",
+    "displayName": "PDF",
+    "vendor": {
+      "key": "cinatra-ai",
+      "name": "Cinatra"
+    },
+    "dependencies": [],
+    "artifact": {
+      "accepts": {
+        "file": {
+          "mimeTypes": [
+            "application/pdf"
+          ]
+        }
+      },
+      "ui": {
+        "abiVersion": 1,
+        "sdkAbiRange": "^2.4.0",
+        "renderers": {
+          "detail": {
+            "entry": "./src/renderers/pdf-detail.tsx",
+            "propsApiVersion": 1,
+            "representations": [
+              "application/pdf"
+            ]
+          },
+          "preview": {
+            "entry": "./src/renderers/pdf-preview.tsx",
+            "propsApiVersion": 1,
+            "representations": [
+              "application/pdf"
+            ]
+          }
+        }
+      }
+    }
+  }
+}
