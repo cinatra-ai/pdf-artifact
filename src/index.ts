@@ -20,6 +20,24 @@ export const pdfArtifactManifest: SemanticArtifactManifest = {
       mimeTypes: ["application/pdf"],
     },
   },
+  // Entry 95 (epic cinatra#1785): the type this pack owns is DECLARED
+  // explicitly, never derived. `pdf` is dedicated-claimed and self-registered
+  // (no inline schema needed); the `accepts.file` MIME claim above classifies
+  // accepted documents INTO this type, it does not create it. An accepted PDF
+  // is an immutable `record` (create-only; no in-app content edits).
+  objectTypes: [
+    {
+      type: "@cinatra-ai/pdf-artifact:pdf",
+      claim: "dedicated",
+      dispositions: {
+        projection: "artifact-safe",
+        pinnable: true,
+        snapshotPolicy: "content",
+        sensitivity: "normal",
+        mutability: "record",
+      },
+    },
+  ],
   ui: {
     abiVersion: 1,
     sdkAbiRange: "^2.4.0",

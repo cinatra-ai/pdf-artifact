@@ -39,6 +39,19 @@
           ]
         }
       },
+      "objectTypes": [
+        {
+          "type": "@cinatra-ai/pdf-artifact:pdf",
+          "claim": "dedicated",
+          "dispositions": {
+            "projection": "artifact-safe",
+            "pinnable": true,
+            "snapshotPolicy": "content",
+            "sensitivity": "normal",
+            "mutability": "record"
+          }
+        }
+      ],
       "ui": {
         "abiVersion": 1,
         "sdkAbiRange": "^2.4.0",
