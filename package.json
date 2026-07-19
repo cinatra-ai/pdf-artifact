@@ -1,6 +1,6 @@
 {
   "name": "@cinatra-ai/pdf-artifact",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "license": "Apache-2.0",
   "type": "module",
   "files": [
@@ -41,7 +41,7 @@
       },
       "objectTypes": [
         {
-          "type": "@cinatra-ai/pdf-artifact:pdf",
+          "type": "@cinatra-ai/pdf-artifact:document",
           "claim": "dedicated",
           "dispositions": {
             "projection": "artifact-safe",
@@ -49,6 +49,30 @@
             "snapshotPolicy": "content",
             "sensitivity": "normal",
             "mutability": "record"
+          },
+          "schema": {
+            "type": "object",
+            "properties": {
+              "title": {
+                "type": "string"
+              },
+              "mime": {
+                "type": "string"
+              },
+              "sizeBytes": {
+                "type": "integer"
+              },
+              "resourceId": {
+                "type": "string"
+              },
+              "representationRevisionId": {
+                "type": "string"
+              },
+              "createdByRunId": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": true
           }
         }
       ],

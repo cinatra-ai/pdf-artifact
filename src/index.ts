@@ -20,14 +20,26 @@ export const pdfArtifactManifest: SemanticArtifactManifest = {
       mimeTypes: ["application/pdf"],
     },
   },
-  // Entry 95 (epic cinatra#1785): the type this pack owns is DECLARED
-  // explicitly, never derived. `pdf` is dedicated-claimed and self-registered
-  // (no inline schema needed); the `accepts.file` MIME claim above classifies
-  // accepted documents INTO this type, it does not create it. An accepted PDF
-  // is an immutable `record` (create-only; no in-app content edits).
+  // Entry 106-B (epic cinatra#1785, upload-typing ruling): the type this pack
+  // owns is DECLARED explicitly, never derived. A human upload maps by MIME to
+  // the REQUIRED system-base pack, which persists it under ITS DECLARED TYPE;
+  // this base must therefore register a concrete objectType or the mime-map
+  // resolves to nothing (post-#1824 the umbrella `${extension}:artifact` is
+  // gone). `document` is the uploaded-PDF document this pack owns:
+  // dedicated-claimed and self-registered. The `accepts.file` MIME claim above
+  // classifies accepted `application/pdf` uploads INTO this type; it does not
+  // create it. An uploaded PDF is an immutable `record` (create-only, no in-app
+  // content edits), content-addressed (snapshotPolicy `content`), pinnable.
+  //
+  // The inline JSON Schema describes the stored uploaded-object metadata as it
+  // is persisted by the host upload path (createUploadedArtifact →
+  // createSemanticArtifact): the display title, the detected/declared MIME, the
+  // blob size in bytes, and the resource + representation-revision references
+  // that point at the stored bytes. `additionalProperties: true` leaves room
+  // for host-side enrichment fields without a manifest bump.
   objectTypes: [
     {
-      type: "@cinatra-ai/pdf-artifact:pdf",
+      type: "@cinatra-ai/pdf-artifact:document",
       claim: "dedicated",
       dispositions: {
         projection: "artifact-safe",
@@ -35,6 +47,18 @@ export const pdfArtifactManifest: SemanticArtifactManifest = {
         snapshotPolicy: "content",
         sensitivity: "normal",
         mutability: "record",
+      },
+      schema: {
+        type: "object",
+        properties: {
+          title: { type: "string" },
+          mime: { type: "string" },
+          sizeBytes: { type: "integer" },
+          resourceId: { type: "string" },
+          representationRevisionId: { type: "string" },
+          createdByRunId: { type: "string" },
+        },
+        additionalProperties: true,
       },
     },
   ],
