@@ -12,6 +12,7 @@
 import { readFileSync } from "node:fs";
 import { describe, it, expect } from "vitest";
 
+import { pdfArtifactManifest } from "../src/index";
 import {
   isIosUserAgent,
   needsPdfInlineFallback,
@@ -27,7 +28,6 @@ const LOADER_SOURCE = readFileSync(
   "utf-8",
 );
 const PREVIEW_SOURCE = readFileSync("src/renderers/pdf-preview.tsx", "utf-8");
-const INDEX_SOURCE = readFileSync("src/index.ts", "utf-8");
 const PKG = JSON.parse(readFileSync("package.json", "utf-8")) as {
   name: string;
   license: string;
@@ -301,13 +301,18 @@ describe("manifest contract", () => {
     expect(PKG.dependencies["pdfjs-dist"]).toBe("5.4.296");
   });
 
-  it("keeps src/index.ts in lock-step with the package.json descriptor", () => {
-    expect(INDEX_SOURCE).toMatch(/mimeTypes: \["application\/pdf"\]/);
-    expect(INDEX_SOURCE).toMatch(/abiVersion: 1/);
-    expect(INDEX_SOURCE).toMatch(/sdkAbiRange: "\^2\.4\.0"/);
-    expect(INDEX_SOURCE).toMatch(/entry: "\.\/src\/renderers\/pdf-detail\.tsx"/);
-    expect(INDEX_SOURCE).toMatch(/entry: "\.\/src\/renderers\/pdf-preview\.tsx"/);
-    expect(INDEX_SOURCE).toMatch(/@cinatra-ai\/pdf-artifact:document/);
+  // The typed `pdfArtifactManifest` export mirrors the `accepts` + `ui`
+  // renderer contract of the authoritative package.json descriptor. The
+  // uploaded-PDF `objectTypes` claim is declared ONLY in package.json (the host
+  // object-registry bridge reads it there — matching audio/video/image); it is
+  // NOT carried on the SDK-typed const, so the agreement is over accepts + ui.
+  // The package.json claim SHAPE is asserted by the objectType tests below.
+  it("keeps the typed src manifest in agreement with package.json", () => {
+    expect(pdfArtifactManifest.accepts).toEqual(artifact.accepts);
+    expect(pdfArtifactManifest.ui).toEqual(artifact.ui);
+    // The typed const does NOT re-declare objectTypes (package.json is the
+    // single source for the claim); guard the outlier from creeping back.
+    expect("objectTypes" in pdfArtifactManifest).toBe(false);
   });
 
   // Upload-typing ruling (epic cinatra#1785; owner entry 106-B). This system
