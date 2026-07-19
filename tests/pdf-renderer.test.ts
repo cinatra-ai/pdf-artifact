@@ -39,6 +39,22 @@ const PKG = JSON.parse(readFileSync("package.json", "utf-8")) as {
     vendor?: { key: string; name: string };
     artifact: {
       accepts: { file?: { mimeTypes: string[] } };
+      objectTypes?: Array<{
+        type: string;
+        claim: string;
+        dispositions?: {
+          projection?: string;
+          pinnable?: boolean;
+          snapshotPolicy?: string;
+          sensitivity?: string;
+          mutability?: string;
+        };
+        schema?: {
+          type?: string;
+          properties?: Record<string, unknown>;
+          additionalProperties?: boolean;
+        };
+      }>;
       ui?: {
         abiVersion: number;
         sdkAbiRange: string;
@@ -291,5 +307,57 @@ describe("manifest contract", () => {
     expect(INDEX_SOURCE).toMatch(/sdkAbiRange: "\^2\.4\.0"/);
     expect(INDEX_SOURCE).toMatch(/entry: "\.\/src\/renderers\/pdf-detail\.tsx"/);
     expect(INDEX_SOURCE).toMatch(/entry: "\.\/src\/renderers\/pdf-preview\.tsx"/);
+    expect(INDEX_SOURCE).toMatch(/@cinatra-ai\/pdf-artifact:document/);
+  });
+
+  // Upload-typing ruling (epic cinatra#1785; owner entry 106-B). This system
+  // base is REQUIRED to declare exactly one concrete objectType, or a human
+  // `application/pdf` upload maps (by MIME) to this pack and then resolves to
+  // NO type post-#1824 (the `${extension}:artifact` umbrella is retired). The
+  // old pure-renderer model — accepts + renderers with no owned type — is dead;
+  // these assertions pin the new model.
+  it("declares exactly one dedicated objectType for the uploaded PDF document", () => {
+    const types = artifact.objectTypes;
+    expect(types).toBeDefined();
+    if (!types) return;
+    expect(types).toHaveLength(1);
+    const doc = types[0];
+    // Self-namespaced (@scope/package:local-id) so the third-party
+    // schema-source rule is satisfied without a new cinatra.dependencies entry.
+    expect(doc.type).toBe("@cinatra-ai/pdf-artifact:document");
+    expect(doc.claim).toBe("dedicated");
+  });
+
+  it("gives the uploaded-PDF type upload-safe, immutable-record dispositions", () => {
+    const doc = artifact.objectTypes?.[0];
+    expect(doc?.dispositions).toEqual({
+      projection: "artifact-safe",
+      pinnable: true,
+      snapshotPolicy: "content",
+      sensitivity: "normal",
+      // An uploaded PDF is a fixed file, not an editable draft and not a live
+      // third-party record: `record`.
+      mutability: "record",
+    });
+  });
+
+  it("ships an inline JSON Schema for the persisted uploaded-object metadata", () => {
+    const schema = artifact.objectTypes?.[0]?.schema;
+    expect(schema).toBeDefined();
+    if (!schema) return;
+    expect(schema.type).toBe("object");
+    // File metadata as persisted by the host upload path
+    // (createUploadedArtifact -> createSemanticArtifact): title, mime, size,
+    // and the resource + representation-revision storage references.
+    expect(Object.keys(schema.properties ?? {}).sort()).toEqual([
+      "createdByRunId",
+      "mime",
+      "representationRevisionId",
+      "resourceId",
+      "sizeBytes",
+      "title",
+    ]);
+    // Open shape — host enrichment fields do not force a manifest bump.
+    expect(schema.additionalProperties).toBe(true);
   });
 });
