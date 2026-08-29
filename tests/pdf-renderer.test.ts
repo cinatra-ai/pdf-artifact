@@ -278,7 +278,7 @@ describe("manifest contract", () => {
     if (!ui) return;
     expect(ui.abiVersion).toBe(1);
     // Generated caret range over the canonical SDK ABI.
-    expect(ui.sdkAbiRange).toBe("^2.4.0");
+    expect(ui.sdkAbiRange).toBe("^2.5.0");
     expect(Object.keys(ui.renderers).sort()).toEqual(["detail", "preview"]);
     for (const slot of ["detail", "preview"] as const) {
       const r = ui.renderers[slot];

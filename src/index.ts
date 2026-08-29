@@ -33,7 +33,7 @@ export const pdfArtifactManifest: SemanticArtifactManifest = {
   },
   ui: {
     abiVersion: 1,
-    sdkAbiRange: "^2.4.0",
+    sdkAbiRange: "^2.5.0",
     renderers: {
       detail: {
         entry: "./src/renderers/pdf-detail.tsx",
