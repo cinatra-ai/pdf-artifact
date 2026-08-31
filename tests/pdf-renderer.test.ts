@@ -9,7 +9,7 @@
  *      well-formed v1 `ui` block, and `src/index.ts` mirrors the package.json
  *      descriptor.
  */
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { describe, it, expect } from "vitest";
 
 import { pdfArtifactManifest } from "../src/index";
@@ -17,6 +17,11 @@ import {
   isIosUserAgent,
   needsPdfInlineFallback,
 } from "../src/renderers/pdf-inline-support";
+import {
+  ARTIFACT_RENDERER_PROPS_API_VERSION,
+  ARTIFACT_RENDERER_PROPS_BYTE_REFERENCE_VERSION,
+} from "../src/renderers/renderer-props";
+import { resolveByteRoad } from "../src/renderers/byte-road";
 
 const DETAIL_SOURCE = readFileSync("src/renderers/pdf-detail.tsx", "utf-8");
 const VIEWER_SOURCE = readFileSync(
@@ -66,6 +71,12 @@ const PKG = JSON.parse(readFileSync("package.json", "utf-8")) as {
     };
   };
 };
+
+const PKG_EXPORTS = (
+  JSON.parse(readFileSync("package.json", "utf-8")) as {
+    exports: Record<string, unknown>;
+  }
+).exports;
 
 const UA = {
   iphoneSafari:
@@ -170,6 +181,103 @@ describe("needsPdfInlineFallback", () => {
   });
 });
 
+describe("the pdf display reads its bytes through the byte reference", () => {
+  const ISLAND = "/api/lifecycle-views/artifact-bytes?bc=sealed-preview";
+  const SESSION = "/api/artifacts/art_1/versions/rev_1/preview";
+
+  it("declares the byte-road props version on every slot, mirror and manifest agreeing", () => {
+    expect(ARTIFACT_RENDERER_PROPS_API_VERSION).toBe(2);
+    expect(ARTIFACT_RENDERER_PROPS_BYTE_REFERENCE_VERSION).toBe(2);
+    for (const slot of ["detail", "preview"] as const) {
+      expect(pdfArtifactManifest.ui.renderers[slot]?.propsApiVersion).toBe(2);
+      expect(PKG.cinatra.artifact.ui?.renderers[slot].propsApiVersion).toBe(2);
+    }
+  });
+
+  it("resolves the island address, never the cookie-gated session route", () => {
+    expect(
+      resolveByteRoad({
+        propsApiVersion: 2,
+        urls: { preview: SESSION, download: "/session-dl" },
+        actions: { download: "/session-dl" },
+        bytes: { road: "island", preview: ISLAND, download: "/island-dl" },
+      }),
+    ).toEqual({ road: "island", preview: ISLAND, download: "/island-dl" });
+  });
+
+  it("falls back to the session href on an older snapshot, and floors on neither", () => {
+    expect(
+      resolveByteRoad({ propsApiVersion: 1, urls: { preview: SESSION, download: null } }),
+    ).toMatchObject({ road: "session", preview: SESSION });
+    expect(
+      resolveByteRoad({ propsApiVersion: 1, urls: { preview: null, download: null } }),
+    ).toMatchObject({ road: "none" });
+  });
+
+  it("takes BOTH slots' addresses off the byte road and neither off urls directly", () => {
+    // The shell is unchanged; only where it reads its address moved. Reading
+    // `urls` in either renderer would put a cookie-gated route on the island.
+    for (const src of [DETAIL_SOURCE, PREVIEW_SOURCE]) {
+      expect(src).toMatch(/resolveByteRoad/);
+      expect(src).not.toMatch(/urls\.preview/);
+      expect(src).not.toMatch(/urls\.download/);
+    }
+  });
+
+  it("keeps the shared previewer itself — no fork, no second viewer", () => {
+    // The embed path, the code-split inline fallback and the download floor are
+    // the SAME shell reading a different address.
+    expect(DETAIL_SOURCE).toMatch(/PdfInlineFallback/);
+    expect(DETAIL_SOURCE).toMatch(/PdfDownloadFloor/);
+    expect(DETAIL_SOURCE).toMatch(/<embed/);
+
+    // AND THE SHELL IS THE ONLY ONE. The three assertions above are all
+    // satisfied by a fork that merely sits BESIDE the shared previewer, so on
+    // their own they are not an anti-fork gate. These pin that there is no
+    // second viewer to be chosen: one embed element and one react-pdf importer
+    // in the whole renderer directory, and no renderer module beyond the set.
+    const rendererModules = readdirSync("src/renderers").sort();
+    expect(rendererModules).toEqual(
+      [
+        "byte-road.ts",
+        "download-link.tsx",
+        "pdf-detail.tsx",
+        "pdf-download-floor.tsx",
+        "pdf-fallback-loader.tsx",
+        "pdf-fallback-viewer.tsx",
+        "pdf-inline-support.ts",
+        "pdf-promise-with-resolvers-polyfill.ts",
+        "pdf-preview.tsx",
+        "renderer-props.ts",
+      ].sort(),
+    );
+
+    const rendererSources = rendererModules.map((f) =>
+      readFileSync(`src/renderers/${f}`, "utf-8"),
+    );
+    const occurrences = (re: RegExp) =>
+      rendererSources.reduce((n, src) => n + (src.match(re)?.length ?? 0), 0);
+
+    // Exactly one embed ELEMENT in the whole directory — the shared shell's.
+    // Anchored to the line start so the many prose mentions of `<embed>` in the
+    // header comments are not counted as elements.
+    expect(occurrences(/^\s*<embed[\s/>]/gm)).toBe(1);
+    // Exactly one react-pdf importer — the code-split fallback viewer, only.
+    expect(occurrences(/from "react-pdf"/g)).toBe(1);
+    expect(VIEWER_SOURCE).toMatch(/from "react-pdf"/);
+  });
+
+  it("resolves every declared renderer entry through the package exports map", () => {
+    const ui = PKG.cinatra.artifact.ui;
+    expect(ui).toBeDefined();
+    if (!ui) return;
+    for (const slot of ["detail", "preview"] as const) {
+      const subpath = ui.renderers[slot].entry.replace(/\.tsx?$/, "");
+      expect(Object.keys(PKG_EXPORTS)).toContain(subpath);
+    }
+  });
+});
+
 describe("pdf-detail source contract", () => {
   it("keeps the lightweight <embed type=\"application/pdf\"> path", () => {
     expect(DETAIL_SOURCE).toMatch(/^"use client";/);
@@ -251,7 +359,7 @@ describe("pdf-fallback-viewer source contract", () => {
 
 describe("pdf-preview source contract", () => {
   it("renders a compact, never-blank card (title fallback + optional open link)", () => {
-    expect(PREVIEW_SOURCE).toMatch(/artifact\.title \?\? "PDF document"/);
+    expect(PREVIEW_SOURCE).toMatch(/artifact\?\.title \?\? "PDF document"/);
     expect(PREVIEW_SOURCE).toMatch(/openHref !== null/);
   });
 });
@@ -284,7 +392,8 @@ describe("manifest contract", () => {
       const r = ui.renderers[slot];
       expect(r.entry.startsWith("./src/renderers/")).toBe(true);
       expect(r.entry.endsWith(".tsx")).toBe(true);
-      expect(r.propsApiVersion).toBe(1);
+      expect(r.propsApiVersion).toBe(ARTIFACT_RENDERER_PROPS_API_VERSION);
+      expect(r.propsApiVersion).toBe(2);
       expect(r.representations).toEqual(["application/pdf"]);
     }
   });

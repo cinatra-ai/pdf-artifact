@@ -37,12 +37,12 @@ export const pdfArtifactManifest: SemanticArtifactManifest = {
     renderers: {
       detail: {
         entry: "./src/renderers/pdf-detail.tsx",
-        propsApiVersion: 1,
+        propsApiVersion: 2,
         representations: ["application/pdf"],
       },
       preview: {
         entry: "./src/renderers/pdf-preview.tsx",
-        propsApiVersion: 1,
+        propsApiVersion: 2,
         representations: ["application/pdf"],
       },
     },
