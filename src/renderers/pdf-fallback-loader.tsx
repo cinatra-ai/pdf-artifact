@@ -24,6 +24,7 @@
 import { Component, Suspense, lazy, useEffect, useState } from "react";
 import type { ErrorInfo, ReactElement, ReactNode } from "react";
 
+import type { ByteRoadName } from "./byte-road";
 import { PdfDownloadFloor } from "./pdf-download-floor";
 
 const PdfFallbackViewer = lazy(() => import("./pdf-fallback-viewer"));
@@ -37,7 +38,11 @@ function Skeleton(): ReactElement {
 }
 
 class LazyViewerBoundary extends Component<
-  { readonly downloadHref: string | null; readonly children: ReactNode },
+  {
+    readonly downloadHref: string | null;
+    readonly road?: ByteRoadName;
+    readonly children: ReactNode;
+  },
   { readonly failed: boolean }
 > {
   state = { failed: false };
@@ -57,6 +62,7 @@ class LazyViewerBoundary extends Component<
       return (
         <PdfDownloadFloor
           downloadHref={this.props.downloadHref}
+          road={this.props.road}
           message="This PDF can’t be previewed inline on this device."
         />
       );
@@ -68,9 +74,11 @@ class LazyViewerBoundary extends Component<
 export function PdfInlineFallback({
   previewHref,
   downloadHref,
+  road,
 }: {
   readonly previewHref: string;
   readonly downloadHref: string | null;
+  readonly road?: ByteRoadName;
 }): ReactElement {
   const [mounted, setMounted] = useState(false);
   useEffect(() => {
@@ -82,7 +90,7 @@ export function PdfInlineFallback({
   }
 
   return (
-    <LazyViewerBoundary downloadHref={downloadHref}>
+    <LazyViewerBoundary downloadHref={downloadHref} road={road}>
       <Suspense fallback={<Skeleton />}>
         <PdfFallbackViewer previewHref={previewHref} downloadHref={downloadHref} />
       </Suspense>

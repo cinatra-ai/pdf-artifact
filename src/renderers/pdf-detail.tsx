@@ -18,18 +18,29 @@
  *   path, and the first client pass corrects it in either direction through the
  *   hydration-safe `useSyncExternalStore` handoff (no setState-in-effect).
  *
- * Never-blank floor: when there is no materialized representation to preview
- * (`urls.preview === null`), the renderer skips straight to the download-link
- * floor — the same terminal state the inline viewer degrades to on any load
- * error — so a malformed or unrenderable document is never a blank panel.
+ * THE ADDRESS COMES FROM THE BYTE ROAD. An embedding element's load is a
+ * subresource request and inside a third-party application it carries no
+ * cookie, so a viewer pointed at the host's session route draws a blank plate
+ * there. At props version 2 the snapshot carries the byte reference the reader
+ * may actually fetch on the surface they are on, and this renderer paints from
+ * it; a snapshot built at the older version has no reference, falls back to the
+ * session href, and still draws. THE PREVIEWER ITSELF IS UNCHANGED — the embed
+ * path, the code-split inline fallback and the download floor are the same
+ * shell, reading a different address.
  *
- * A v1 renderer requests no host ports: it reads only the authorized props
- * snapshot (`urls.preview` / `urls.download`), never a host closure.
+ * Never-blank floor: when no road carries a previewable address, the renderer
+ * skips straight to the download-link floor — the same terminal state the
+ * inline viewer degrades to on any load error — so a malformed or unrenderable
+ * document is never a blank panel.
+ *
+ * The renderer requests no host ports: it reads only the authorized props
+ * snapshot, builds no address of its own, and fetches nothing itself.
  */
 
 import { useState, useSyncExternalStore } from "react";
 import type { ReactElement } from "react";
 
+import { resolveByteRoad } from "./byte-road";
 import { PdfDownloadFloor } from "./pdf-download-floor";
 import { PdfInlineFallback } from "./pdf-fallback-loader";
 import { needsPdfInlineFallback } from "./pdf-inline-support";
@@ -51,11 +62,10 @@ function detectFallbackOnClient(): boolean {
   });
 }
 
-export default function PdfDetailRenderer({
-  urls,
-}: ArtifactRendererProps): ReactElement {
-  const previewHref = urls.preview;
-  const downloadHref = urls.download;
+export default function PdfDetailRenderer(props: ArtifactRendererProps): ReactElement {
+  const bytes = resolveByteRoad(props);
+  const previewHref = bytes.preview;
+  const downloadHref = bytes.download;
 
   // Server render + hydration default to the lightweight `<embed>` path; the
   // first client pass swaps to the full-signal detection. Both snapshots are
@@ -71,23 +81,30 @@ export default function PdfDetailRenderer({
   // fire it, its own in-embed error UI stands in, still not a blank panel).
   const [embedFailed, setEmbedFailed] = useState(false);
 
-  // No materialized representation — go straight to the never-blank floor.
+  // No previewable address on any road — go straight to the never-blank floor.
   if (previewHref === null) {
-    return <PdfDownloadFloor downloadHref={downloadHref} />;
+    return <PdfDownloadFloor downloadHref={downloadHref} road={bytes.road} />;
   }
 
   if (embedFailed) {
-    return <PdfDownloadFloor downloadHref={downloadHref} />;
+    return <PdfDownloadFloor downloadHref={downloadHref} road={bytes.road} />;
   }
 
   if (useFallback) {
     return (
-      <PdfInlineFallback previewHref={previewHref} downloadHref={downloadHref} />
+      <PdfInlineFallback
+        previewHref={previewHref}
+        downloadHref={downloadHref}
+        road={bytes.road}
+      />
     );
   }
 
   return (
-    <article className="soft-panel rounded-card overflow-hidden p-0">
+    <article
+      className="soft-panel rounded-card overflow-hidden p-0"
+      data-byte-road={bytes.road}
+    >
       <embed
         src={previewHref}
         type="application/pdf"
