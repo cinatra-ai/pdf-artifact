@@ -1,10 +1,9 @@
 /**
  * Tests for the migrated PDF renderer. Node-env (no jsdom — the renderer JSX is
  * asserted structurally, matching the host's PDF-handler test convention):
- *   1. pure unit matrix for `needsPdfInlineFallback` / `isIosUserAgent`;
+ *   1. the byte-road resolution the display paints from;
  *   2. source assertions pinning the ported structural guarantees (embed path
- *      kept, code-split react-pdf fallback, worker from our origin, layers off,
- *      polyfill order, never-blank floor);
+ *      kept, never-blank floor);
  *   3. manifest contract: the package claims EXACTLY `application/pdf`, ships a
  *      well-formed v1 `ui` block, and `src/index.ts` mirrors the package.json
  *      descriptor.
@@ -14,29 +13,17 @@ import { describe, it, expect } from "vitest";
 
 import { pdfArtifactManifest } from "../src/index";
 import {
-  isIosUserAgent,
-  needsPdfInlineFallback,
-} from "../src/renderers/pdf-inline-support";
-import {
   ARTIFACT_RENDERER_PROPS_API_VERSION,
   ARTIFACT_RENDERER_PROPS_BYTE_REFERENCE_VERSION,
 } from "../src/renderers/renderer-props";
 import { resolveByteRoad } from "../src/renderers/byte-road";
 
 const DETAIL_SOURCE = readFileSync("src/renderers/pdf-detail.tsx", "utf-8");
-const VIEWER_SOURCE = readFileSync(
-  "src/renderers/pdf-fallback-viewer.tsx",
-  "utf-8",
-);
-const LOADER_SOURCE = readFileSync(
-  "src/renderers/pdf-fallback-loader.tsx",
-  "utf-8",
-);
 const PREVIEW_SOURCE = readFileSync("src/renderers/pdf-preview.tsx", "utf-8");
 const PKG = JSON.parse(readFileSync("package.json", "utf-8")) as {
   name: string;
   license: string;
-  dependencies: Record<string, string>;
+  dependencies?: Record<string, string>;
   cinatra: {
     kind: string;
     apiVersion: string;
@@ -78,108 +65,8 @@ const PKG_EXPORTS = (
   }
 ).exports;
 
-const UA = {
-  iphoneSafari:
-    "Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1",
-  iphoneChrome:
-    "Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) CriOS/125.0.6422.51 Mobile/15E148 Safari/604.1",
-  ipadLegacy:
-    "Mozilla/5.0 (iPad; CPU OS 15_8 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/15.8 Mobile/15E148 Safari/604.1",
-  macSafari:
-    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Safari/605.1.15",
-  windowsChrome:
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
-  androidChrome:
-    "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.6422.52 Mobile Safari/537.36",
-} as const;
 
-describe("isIosUserAgent", () => {
-  it("matches iPhone / iPad / iOS-Chrome user agents", () => {
-    expect(isIosUserAgent(UA.iphoneSafari)).toBe(true);
-    expect(isIosUserAgent(UA.iphoneChrome)).toBe(true);
-    expect(isIosUserAgent(UA.ipadLegacy)).toBe(true);
-  });
 
-  it("does not match desktop user agents (incl. real Macs)", () => {
-    expect(isIosUserAgent(UA.macSafari)).toBe(false);
-    expect(isIosUserAgent(UA.windowsChrome)).toBe(false);
-    expect(isIosUserAgent(UA.androidChrome)).toBe(false);
-  });
-});
-
-describe("needsPdfInlineFallback", () => {
-  it("always falls back on iOS UAs — even if pdfViewerEnabled claims true", () => {
-    for (const pdfViewerEnabled of [true, false, undefined]) {
-      expect(
-        needsPdfInlineFallback({
-          userAgent: UA.iphoneSafari,
-          maxTouchPoints: 5,
-          pdfViewerEnabled,
-        }),
-      ).toBe(true);
-    }
-  });
-
-  it("falls back on iPadOS masquerading as a Mac (touch points)", () => {
-    expect(
-      needsPdfInlineFallback({
-        userAgent: UA.macSafari,
-        maxTouchPoints: 5,
-        pdfViewerEnabled: true,
-      }),
-    ).toBe(true);
-  });
-
-  it("keeps the embed on a real Mac (no touch points)", () => {
-    expect(
-      needsPdfInlineFallback({
-        userAgent: UA.macSafari,
-        maxTouchPoints: 0,
-        pdfViewerEnabled: true,
-      }),
-    ).toBe(false);
-  });
-
-  it("keeps the embed on desktop Chrome with an inline viewer", () => {
-    expect(
-      needsPdfInlineFallback({
-        userAgent: UA.windowsChrome,
-        maxTouchPoints: 0,
-        pdfViewerEnabled: true,
-      }),
-    ).toBe(false);
-  });
-
-  it("ignores touch points on non-Macintosh UAs (touch-screen Windows laptop)", () => {
-    expect(
-      needsPdfInlineFallback({
-        userAgent: UA.windowsChrome,
-        maxTouchPoints: 10,
-        pdfViewerEnabled: true,
-      }),
-    ).toBe(false);
-  });
-
-  it("falls back when the engine reports pdfViewerEnabled === false (Android Chrome)", () => {
-    expect(
-      needsPdfInlineFallback({
-        userAgent: UA.androidChrome,
-        maxTouchPoints: 5,
-        pdfViewerEnabled: false,
-      }),
-    ).toBe(true);
-  });
-
-  it("keeps the embed when the capability signal is absent on desktop", () => {
-    expect(
-      needsPdfInlineFallback({
-        userAgent: UA.windowsChrome,
-        maxTouchPoints: 0,
-        pdfViewerEnabled: undefined,
-      }),
-    ).toBe(false);
-  });
-});
 
 describe("the pdf display reads its bytes through the byte reference", () => {
   const ISLAND = "/api/lifecycle-views/artifact-bytes?bc=sealed-preview";
@@ -225,17 +112,18 @@ describe("the pdf display reads its bytes through the byte reference", () => {
   });
 
   it("keeps the shared previewer itself — no fork, no second viewer", () => {
-    // The embed path, the code-split inline fallback and the download floor are
-    // the SAME shell reading a different address.
-    expect(DETAIL_SOURCE).toMatch(/PdfInlineFallback/);
+    // The embed path and the download floor are the SAME shell reading a
+    // different address. There is no third reading to fork (§XI.2: "no renderer
+    // of ours paints a document's pages") — `embedded-viewer-only.test.ts` is
+    // the gate on that; this one pins that the ONE shell is not duplicated.
     expect(DETAIL_SOURCE).toMatch(/PdfDownloadFloor/);
     expect(DETAIL_SOURCE).toMatch(/<embed/);
 
-    // AND THE SHELL IS THE ONLY ONE. The three assertions above are all
-    // satisfied by a fork that merely sits BESIDE the shared previewer, so on
-    // their own they are not an anti-fork gate. These pin that there is no
-    // second viewer to be chosen: one embed element and one react-pdf importer
-    // in the whole renderer directory, and no renderer module beyond the set.
+    // AND THE SHELL IS THE ONLY ONE. The assertions above are satisfied by a
+    // fork that merely sits BESIDE the shared previewer, so on their own they
+    // are not an anti-fork gate. This pins that there is no second viewer to be
+    // chosen: one embed element in the whole renderer directory, and no
+    // renderer module beyond the set.
     const rendererModules = readdirSync("src/renderers").sort();
     expect(rendererModules).toEqual(
       [
@@ -243,10 +131,6 @@ describe("the pdf display reads its bytes through the byte reference", () => {
         "download-link.tsx",
         "pdf-detail.tsx",
         "pdf-download-floor.tsx",
-        "pdf-fallback-loader.tsx",
-        "pdf-fallback-viewer.tsx",
-        "pdf-inline-support.ts",
-        "pdf-promise-with-resolvers-polyfill.ts",
         "pdf-preview.tsx",
         "renderer-props.ts",
       ].sort(),
@@ -259,12 +143,9 @@ describe("the pdf display reads its bytes through the byte reference", () => {
       rendererSources.reduce((n, src) => n + (src.match(re)?.length ?? 0), 0);
 
     // Exactly one embed ELEMENT in the whole directory — the shared shell's.
-    // Anchored to the line start so the many prose mentions of `<embed>` in the
-    // header comments are not counted as elements.
+    // Anchored to the line start so the many prose mentions of the embed
+    // element in the header comments are not counted as elements.
     expect(occurrences(/^\s*<embed[\s/>]/gm)).toBe(1);
-    // Exactly one react-pdf importer — the code-split fallback viewer, only.
-    expect(occurrences(/from "react-pdf"/g)).toBe(1);
-    expect(VIEWER_SOURCE).toMatch(/from "react-pdf"/);
   });
 
   it("resolves every declared renderer entry through the package exports map", () => {
@@ -286,7 +167,7 @@ describe("pdf-detail source contract", () => {
     expect(DETAIL_SOURCE).toMatch(/aria-label="PDF preview"/);
   });
 
-  it("does NOT statically import react-pdf (the chunk must stay lazy)", () => {
+  it("imports no page-rendering library at all — there is no lazy chunk either", () => {
     expect(DETAIL_SOURCE).not.toMatch(/from\s+"react-pdf"/);
     expect(DETAIL_SOURCE).not.toMatch(/from\s+"pdfjs-dist/);
   });
@@ -295,62 +176,16 @@ describe("pdf-detail source contract", () => {
     // no materialized representation, and a fired <embed> onError, both floor.
     expect(DETAIL_SOURCE).toMatch(/previewHref === null/);
     expect(DETAIL_SOURCE).toMatch(/PdfDownloadFloor/);
-    expect(DETAIL_SOURCE).toMatch(/PdfInlineFallback/);
     expect(DETAIL_SOURCE).toMatch(/onError=\{\(\) => setEmbedFailed\(true\)\}/);
     expect(DETAIL_SOURCE).toMatch(/embedFailed/);
   });
 });
 
-describe("pdf-fallback-loader source contract", () => {
-  it("reaches the heavy viewer only through a dynamic import (React.lazy), client-only", () => {
-    expect(LOADER_SOURCE).toMatch(/^"use client";/);
-    expect(LOADER_SOURCE).toMatch(
-      /lazy\(\(\) => import\("\.\/pdf-fallback-viewer"\)\)/,
-    );
-    // ssr:false equivalent — gated behind a mount flag.
-    expect(LOADER_SOURCE).toMatch(/setMounted\(true\)/);
-  });
 
-  it("isolates a lazy-import / module-eval failure to the download floor (never-blank)", () => {
-    // A rejected import() or a viewer module-eval throw must degrade to the
-    // floor here, not propagate past the renderer and blank the whole panel.
-    expect(LOADER_SOURCE).toMatch(/getDerivedStateFromError/);
-    expect(LOADER_SOURCE).toMatch(/PdfDownloadFloor/);
-  });
-});
 
-describe("pdf-fallback-viewer source contract", () => {
-  it("serves the pdf.js worker from our origin via import.meta.url — never a remote host", () => {
-    expect(VIEWER_SOURCE).toMatch(
-      /new URL\(\s*"pdfjs-dist\/build\/pdf\.worker\.min\.mjs",\s*import\.meta\.url,?\s*\)/,
-    );
-    expect(VIEWER_SOURCE).not.toMatch(/https?:\/\//);
-  });
-
-  it("evaluates the Promise.withResolvers polyfill before react-pdf", () => {
-    const polyfillAt = VIEWER_SOURCE.indexOf(
-      '"./pdf-promise-with-resolvers-polyfill"',
-    );
-    const reactPdfAt = VIEWER_SOURCE.indexOf('"react-pdf"');
-    expect(polyfillAt).toBeGreaterThan(-1);
-    expect(reactPdfAt).toBeGreaterThan(-1);
-    expect(polyfillAt).toBeLessThan(reactPdfAt);
-  });
-
-  it("bounds per-page work: layers off, devicePixelRatio capped, batched pages", () => {
-    expect(VIEWER_SOURCE).toMatch(/renderTextLayer=\{false\}/);
-    expect(VIEWER_SOURCE).toMatch(/renderAnnotationLayer=\{false\}/);
-    expect(VIEWER_SOURCE).toMatch(/MAX_DEVICE_PIXEL_RATIO/);
-    expect(VIEWER_SOURCE).toMatch(/PAGE_BATCH_SIZE/);
-  });
-
-  it("offers the passed-in download link on failure (never derives the download url)", () => {
-    expect(VIEWER_SOURCE).toMatch(/downloadHref/);
-    expect(VIEWER_SOURCE).not.toMatch(/replace\([^)]*preview/);
-  });
-
-  it("imports no host-internal (@/...) module and no framework router", () => {
-    for (const src of [DETAIL_SOURCE, VIEWER_SOURCE, LOADER_SOURCE, PREVIEW_SOURCE]) {
+describe("pdf-detail / pdf-preview import hygiene", () => {
+  it("imports no host-internal module and no framework router", () => {
+    for (const src of [DETAIL_SOURCE, PREVIEW_SOURCE]) {
       expect(src).not.toMatch(/from\s+"@\//);
       expect(src).not.toMatch(/from\s+"next\//);
     }
@@ -398,16 +233,11 @@ describe("manifest contract", () => {
     }
   });
 
-  it("declares react-pdf + pdfjs-dist and pins pdfjs-dist to the exact version react-pdf expects", () => {
-    // Version parity: react-pdf and the standalone pdfjs-dist pin must resolve to
-    // ONE pdfjs instance, or the inline fallback throws "API version does not
-    // match Worker version". react-pdf@10 depends on pdfjs-dist 5.4.296.
-    // react-pdf is pinned EXACTLY (not a caret range): react-pdf@10.4.1 depends
-    // on pdfjs-dist 5.4.296, and the standalone pin matches, so exactly one
-    // pdfjs instance resolves. A caret would let a later react-pdf pull a
-    // different pdfjs and reintroduce the two-instance worker mismatch.
-    expect(PKG.dependencies["react-pdf"]).toBe("10.4.1");
-    expect(PKG.dependencies["pdfjs-dist"]).toBe("5.4.296");
+  it("declares no page-rendering dependency", () => {
+    // The canvas viewer that needed them is gone (§XI.2: "no renderer of ours
+    // paints a document's pages"), so the heavy pdf libraries are not shipped
+    // and their two-instance worker-version hazard cannot return.
+    expect(PKG.dependencies).toBeUndefined();
   });
 
   // The typed `pdfArtifactManifest` export mirrors the `accepts` + `ui`

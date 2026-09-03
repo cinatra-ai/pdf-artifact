@@ -19,10 +19,6 @@
       "default": "./src/renderers/pdf-detail.tsx"
     }
   },
-  "dependencies": {
-    "react-pdf": "10.4.1",
-    "pdfjs-dist": "5.4.296"
-  },
   "peerDependencies": {
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
