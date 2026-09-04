@@ -5,11 +5,12 @@ import { DownloadLink } from "./download-link";
 
 /**
  * The shared never-blank floor for the PDF renderer: a host-styled card with a
- * short explanation and the download affordance. Every failure/edge path — no
- * materialized representation, an `<embed>` load error, a react-pdf chunk/eval
- * failure, or an inline-viewer load error — degrades to THIS card rather than a
- * blank panel. The download link itself degrades to a plain note when there is
- * no downloadable content, so the card renders in every state.
+ * short explanation and the download affordance. It is the drawing's second
+ * reading — "the download floor, where there is no preview to show, so the panel
+ * is never blank" — and every path that is not the embedded viewer arrives here:
+ * no materialized representation, or an `<embed>` load error. The download link
+ * itself degrades to a plain note when there is no downloadable content, so the
+ * card renders in every state.
  *
  * `road` names the byte road the offered address is on, so the floor says which
  * road it reached the end of rather than leaving the surface to guess.
@@ -17,7 +18,7 @@ import { DownloadLink } from "./download-link";
 export function PdfDownloadFloor({
   downloadHref,
   road,
-  message = "This PDF can’t be previewed here.",
+  message = "This PDF cannot be previewed here.",
 }: {
   readonly downloadHref: string | null;
   readonly road?: ByteRoadName;

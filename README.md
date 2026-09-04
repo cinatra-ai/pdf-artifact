@@ -1,6 +1,6 @@
 # PDF
 
-The system viewer for PDF documents in the Cinatra library. Any artifact whose bytes are `application/pdf` renders inline through this extension: the browser's built-in PDF viewer handles paging and scrolling on desktop, and an inline fallback keeps documents readable on devices where the embedded viewer does not work. When a PDF cannot be shown inline the viewer always falls back to a download link rather than a blank panel, so a malformed or unrenderable file never leaves an empty page. It is a system base — installed and active for every workspace with no credentials or configuration, and it claims exactly one media type, `application/pdf`.
+The system viewer for PDF documents in the Cinatra library. Any artifact whose bytes are `application/pdf` renders inline through this extension: the browser's built-in PDF viewer handles paging and scrolling. When there is no preview to show the display falls back to a download link rather than a blank panel, so a malformed or unrenderable file never leaves an empty page. The extension paints no pages of its own. It is a system base — installed and active for every workspace with no credentials or configuration, and it claims exactly one media type, `application/pdf`.
 
 ## Works with
 
