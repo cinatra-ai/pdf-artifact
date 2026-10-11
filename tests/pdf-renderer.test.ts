@@ -129,6 +129,7 @@ describe("the pdf display reads its bytes through the byte reference", () => {
       [
         "byte-road.ts",
         "download-link.tsx",
+        "list-row.tsx",
         "pdf-detail.tsx",
         "pdf-download-floor.tsx",
         "pdf-preview.tsx",
@@ -222,7 +223,7 @@ describe("manifest contract", () => {
     expect(ui.abiVersion).toBe(1);
     // Generated caret range over the canonical SDK ABI.
     expect(ui.sdkAbiRange).toBe("^2.5.0");
-    expect(Object.keys(ui.renderers).sort()).toEqual(["detail", "preview"]);
+    expect(Object.keys(ui.renderers).sort()).toEqual(["detail", "listRow", "preview"]);
     for (const slot of ["detail", "preview"] as const) {
       const r = ui.renderers[slot];
       expect(r.entry.startsWith("./src/renderers/")).toBe(true);
@@ -237,7 +238,7 @@ describe("manifest contract", () => {
     // The canvas viewer that needed them is gone (§XI.2: "no renderer of ours
     // paints a document's pages"), so the heavy pdf libraries are not shipped
     // and their two-instance worker-version hazard cannot return.
-    expect(PKG.dependencies).toBeUndefined();
+    expect(PKG.dependencies).toEqual({ "lucide-react": "^1.20.0" });
   });
 
   // The typed `pdfArtifactManifest` export mirrors the `accepts` + `ui`

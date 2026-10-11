@@ -17,7 +17,11 @@
     "./src/renderers/pdf-detail": {
       "import": "./src/renderers/pdf-detail.tsx",
       "default": "./src/renderers/pdf-detail.tsx"
-    }
+    },
+    "./src/renderers/list-row": "./src/renderers/list-row.tsx"
+  },
+  "dependencies": {
+    "lucide-react": "^1.20.0"
   },
   "peerDependencies": {
     "react": "^19.0.0",
@@ -100,6 +104,10 @@
             "representations": [
               "application/pdf"
             ]
+          },
+          "listRow": {
+            "entry": "./src/renderers/list-row.tsx",
+            "propsApiVersion": 1
           }
         }
       }

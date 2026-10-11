@@ -10,7 +10,7 @@ import type { SemanticArtifactManifest } from "@cinatra-ai/sdk-extensions";
 // "no renderer of ours paints a document's pages".
 //
 // The `ui` block is the versioned artifact-renderer contract (abiVersion 1): a
-// per-slot map over the closed v1 slot enum (`detail`, `preview`). A v1 renderer
+// per-slot map over the closed v1 slot enum (`detail`, `preview`, `listRow`). A v1 renderer
 // requests NO host ports — it renders only from the host-supplied authorized
 // props snapshot — so each entry carries just { entry, propsApiVersion,
 // representations }. `sdkAbiRange` is generated from the canonical SDK ABI and
@@ -45,6 +45,10 @@ export const pdfArtifactManifest: SemanticArtifactManifest = {
         entry: "./src/renderers/pdf-preview.tsx",
         propsApiVersion: 2,
         representations: ["application/pdf"],
+      },
+      listRow: {
+        entry: "./src/renderers/list-row.tsx",
+        propsApiVersion: 1,
       },
     },
   },
